@@ -16,7 +16,7 @@ $ gcc main.c llist.c heap.c -o heap_test
 $ ./heap_test
 ```
 
-这回运行分配器的一个demo并输出一些信息.
+这会运行分配器的一个demo并输出一些信息.
 
 ### Explanation
 ------------

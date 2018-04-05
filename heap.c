@@ -28,6 +28,7 @@ void *heap_alloc(heap_t *heap, size_t size) {
         found = get_best_fit(temp, size);
     }
 
+    // 找到的结点过大, 从中切割出来
     if ((found->size - size) > (overhead + MIN_ALLOC_SZ)) {
         node_t *split = (node_t *) (((char *) found + sizeof(node_t) + sizeof(footer_t)) + size);
         split->size = found->size - size - sizeof(node_t) - sizeof(footer_t);
