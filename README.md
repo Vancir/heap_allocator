@@ -1,60 +1,48 @@
 # SHMALL - Simple Heap Memory ALLocator
 ------------
-This is a simple heap allocator I wrote for a hobby OS I have been working on. I wrote this allocator with very little research, and it is made to be as easy to understand as possible. I think this repository can be useful to those who are new to OS development (like myself), or are interested in seeing a simplified version or functions like malloc and free.
+这是作者[@CCareaga](https://github.com/CCareaga)为OS爱好者而编写的一个简单堆分配器. CCareaga编写的这个堆分配器力图尽可能易于理解. 希望能帮到那些OS开发的初学者以及那些对malloc和free的简单函数实现感兴趣的人.
 
 ---
 ![SHAMLL](SHMALL.png "SHMALL")
 ---
 
-### Features
-------------
-  - Binning uses doubly-linked lists based on size.
-  - Coalescing freed chunks.
-  - Quick Best-fit due to sorting of free lists.
-  - Easy expansion and contraction.
-  - Very small (about 230 lines, heap and linked-list)
-
 ### Compiling
 ------------
-There are two header files that define the heap and the linked list.
-to compile this repository:
+代码中包含两个头文件, 各自用于定义堆和链表.
+
+编译命令:
 ``` 
 $ gcc main.c llist.c heap.c -o heap_test 
 $ ./heap_test
 ```
 
-this will run a demo of the allocator and print out some information.
-
+这回运行分配器的一个demo并输出一些信息.
 
 ### Explanation
 ------------
 
 ##### Initialization:
-In order to initialize this heap, a section of memory must be provided. In this repository, that memory is supplied by ```malloc``` (yes, allocating a heap via heap). In an OS setting some pages would need to be mapped and supplied to the heap (one scenario). Note that the bins in the ```heap_t``` struct also need memory allocated for them.
 
-When the function init_heap is called the address of the empty heap struct (with allocated bin pointers) must be provided. The init_heap function will then create one large chunk with header (```node_t``` struct) and a footer (```footer_t``` struct). To determine the size of this chunk the function uses the constant ```HEAP_INIT_SIZE```. It will add this to the ```start``` argument in order to determine where the heap ends.
+需要提供一块内存用以初始化堆空间. 在这里是用的`malloc`进行分配. `heap_t`结构中的bins也同样需要分配内存
+
+调用函数`init_heap`必须要提供一个空白堆结构的地址. 函数`init_heap`会创建一个chunk, chunk包含有一个header(`node_t`结构)和一个footer(`footer_t`结构). 函数需要使用常量`HEAP_INIT_SIZE`来确定chunk的大小, 并将其添加到`start`参数中以便确定heap的终结位置.
 
 ##### Metadata and Design:
-Each chunk of memory has a node struct at the begining and a footer struct at the end. The node holds size, whether the chunk is free or not, and two pointers used in the doubly-linked list (next and prev). The footer struct simply holds a pointer to the header (used while freeing adjacent chunks). The chunk at the end of the heap is called the "wilderness" chunk. It is the largest chunk and its min and max sizes are defined in heap.h. contracting and expanding the heap is as easy as resizing this wilderness chunk. Free chunks of memory are stored in "bins" each bin is actually just a doubly-linked lists of nodes with similar sizes. The heap structure holds a defined number of bins (```BIN_COUNT``` in heap.h). To determine which bin to place a chunk, the size of the chunk is mapped to a bin index by the function ```get_bin_index```. This consistent binning function will ensure that chunks can be accesed and stored in defined fashion. Chunks are sorted as they are inserted into the bins so chunk insertion is not O(1) but this makes it much easier to find chunks that have the best fit. Note, the binning function can be defined however the user of this heap feels fit. it  may be beneficial to determine a more sophisticated binning function in order to aid the quick retrieval of chunks.
+
+每个chunk的内存都包含一个位于开头的node结构和一个位于结尾的footer结构. 无论chunk被释放与否, node结构都包含有chunk的size以及2个用于双向链表中的指针(next和prev). footer结构只包含一个指向header的指针(当要释放相邻chunk时会用到这个指针). 在堆末尾的chunk被称为`wilderness chunk`. 它是堆中最大的chunk并且它的最大最小值都有在heap.h中声明. 合并或扩展chunk时就可以通过伸缩wilderness chunk来实现. 被释放的chunk存储在`bin`里, 每个bin实际上只是一个由大小相近的node组成的双向链表. 堆结构包含一定数量的bin, 数量在heap.h里的`BIN_COUNT`有定义. 要确定哪个bin放哪种chunk, 使用函数`get_bin_index`, 将chunk的size作为索引进行确定. 
+
+这种一致的binning函数可以确保chunk可以以预定的方式来访问和存储. chunks按顺序插入到bin中, 所以chunk的插入操作并不是O(1), 但也变得更加方便查找最合适的chunk. 注意, 你可以自己定义binning函数, 尽管默认的binning函数的表现已经足够优秀. 确定一个可以帮助快速检索chunk的更复杂binning函数也许是十分值得的. 
 
 ##### Allocation:
-The function ```heap_alloc``` takes the address of the heap struct to allocate from and a size. The function simply uses ```get_bin_index``` to determine where a chunk of this size SHOULD be, of course there may not be a chunk of that size. If no chunks are found in the corresponding bin then the next bin will be checked. This will continue until a chunk is found, or the last bin is reached in which case a peice of memory will just be taken from the wilderness chunk. If the chunk that is found is large enough then it will be split. In order to determine if a chunk should be split the amount of metadata (overhead) is subtracted from what our current allocation doesn't use. If what is left is bigger than or equal to ```MIN_ALLOC_SZ``` then it means we should split this chunk and place the leftovers in the correct bin. Once we are ready to return the chunk we found then we take the address of the ```next``` field and return that. This is done because the ```next``` and ```prev``` fields are unused while a chunk is allocated therefore the user of the chunk can write data to these fields without any affecting the inner-workings of the heap.
+
+函数`heap_alloc`取刚刚分配的heap结构地址以及一个size作为参数. 使用函数`get_bin_index`来确定对应size的chunk的位置, 当然也许并没有那个size的chunk存在. 如果没有在对应的bin中找到合适的chunk, 那么就会检查下一个bin, 直到找到一个合适的chunk, 或是在找的过程中到达了最后一个bin(也没有找到), 这种情况下会从wilderness堆块中取一块内存出来创建chunk. 如果找到的chunk过大, 那么就会将该chunk分割一小块回收进bin里. 在判定一个chunk是否需要分割的时候, 会减去chunk中不需要使用的元数据(overhead)的大小, 根据剩下的size来确定. 如果chunk分割后, chunk左边的部分内存大于或等于`MIN_ALLOC_SZ`, 那我们就应该继续分割chunk并将剩余部分放到合适的bin中. 一旦我们准备好返回我们找到的chunk, 我们返回chunk的`next`地址. 这是因为分配chunk时我们并没有用到`next`和`prev`, 因此chunk的使用者可以将数据写进`next`域, 而这不会对堆的内部工作产生丝毫影响.
 
 ##### Freeing: 
-The function ```heap_free``` takes a pointer returned by ```heap_alloc```. It subtracts the correct offset in order to get the address of the node struct. Instead of simply placing the chunk into the correct bin, the chunks surrounding the provided chunk are checked. If either of these chunks are free then we can coalesce the chunks in order to create a larger chunk. To colaesce the chunks the footer is used to get the node struct of the previous chunk and the node struct of the next chunk. For example, say we have a chunk called ```to_free```. To get the the chunk before this chunk we subtract ```sizeof(footer_t)``` to get the footer of the previous chunk. The footer holds a pointer to the head of the previous chunk. To get the next chunk we simply get the footer of ```to_free``` and then add ```sizeof(footer_t)``` in order to get the next chunk. Once all of this is done and sizes are re-calculated the chunk is placed back into a bin.
 
+函数`heap_free`获取`heap_alloc`返回的指针. 通过减去合适的偏移量以获取node结构的正确地址. 函数`heap_free`并不是简单地将chunk放置在对应的bin里就行了, 还会检查chunk周边的其他chunk. 如果周边的chunk处于空闲状态那么我们就可以将这些chunk合并成一个更大的chunk. 为了合并这些chunk, 我们需要使用footer来获取前一个chunk和后一个chunk的node结构. 比方说, 我们有一个叫`to_free`的chunk. 我们减去`sizeof(footer_t)`可以获取前一个chunk的footer, 这个footer包含一个指向前一个chunk头部的指针. 而获取后一个chunk , 我们相反加上`sizeof(footer_t)`即可. 当合并完毕, 我们会重新计算合并后的chunk的大小并放置进bin里
 
-### Possible Improvements
-------------
-  - Error-Checking - check for heap corruption, double-free, etc.
-  - Improve binning policy.
-    - currently the heap uses a simple hashing function to map chunk sizes to a bin index.
-  - Rigorous testing to determine if crashes or fragmentation occur.
-  - Minimize overhead (metadata) 
-    - possibly change footer to hold a size rather than a pointer to a header.
 
 ### Sources 
 ------------
 * [Doug Lea's Memory Allocator](http://g.oswego.edu/dl/html/malloc.html)
 
-NOTE: This code was originally compiled for 32-bit machine, this means that when this code was used it was acceptable to cast an int to a pointer due to the fact they are both the same size. On a 64-bit system the compiler will warn you of the size difference. To silence these warnings I have used the ```uintptr_t``` when casting from an unsigned int to a pointer. This does muddy the readability a bit and some of the casts and pointer arithmetic are verbose so bear that in mind when reading the code.  

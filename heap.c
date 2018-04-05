@@ -2,10 +2,12 @@
 #include "include/llist.h"
 
 uint offset = 8;
-
+// 初始化一个全局堆块
 void init_heap(heap_t *heap, long start) {
+    // 在start位置创建一个结点
     node_t *init_region = (node_t *) start;
     init_region->hole = 1;
+    // size是HEAP_INIT_SIZE除去node自身大小和footer后的剩余大小
     init_region->size = (HEAP_INIT_SIZE) - sizeof(node_t) - sizeof(footer_t);
 
     create_foot(init_region);

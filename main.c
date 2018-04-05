@@ -6,17 +6,21 @@
 int main(int argc, char** argv) {
     int i;
 
+    // 申请一个堆结构
     heap_t *heap = malloc(sizeof(heap_t));
     memset(heap, 0, sizeof(heap_t));
 
+    // 申请一个内存区域, 用以存放堆结构
     void *region = malloc(HEAP_INIT_SIZE);
     memset(region, 0, HEAP_INIT_SIZE);
     
+    // 一个堆结构包含数个bins链表
     for (i = 0; i < BIN_COUNT; i++) {
         heap->bins[i] = malloc(sizeof(bin_t));
         memset(heap->bins[i], 0, sizeof(bin_t));
     }
 
+    // 取region的首地址存放heap进行初始化
     init_heap(heap, (long) region);
     
     printf("overhead = %d \n", overhead);

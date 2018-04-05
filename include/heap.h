@@ -20,7 +20,7 @@ typedef unsigned int uint;
 
 typedef struct node_t {
     uint hole;
-    uint size;
+    uint size;  // node内容大小
     struct node_t* next;
     struct node_t* prev;
 } node_t;
@@ -29,6 +29,7 @@ typedef struct {
     node_t *header;
 } footer_t;
 
+// bins包含一个head结点, 连接着一条双向链表
 typedef struct {
     node_t* head;
 } bin_t;
